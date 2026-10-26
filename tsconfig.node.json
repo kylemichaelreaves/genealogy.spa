@@ -5,7 +5,7 @@
     "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["node"],
+    "types": ["node", "vite/client"],
     "skipLibCheck": true,
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
@@ -20,7 +20,8 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
-    // Unit tests reach into src, and useTreeLayout pulls in PersonCard.tsx.
+    // Unit tests render src components (JSX) and import modules that read
+    // import.meta.env, hence the JSX settings and the vite/client types.
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
     "strict": true,
