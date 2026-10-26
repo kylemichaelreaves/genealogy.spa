@@ -15,6 +15,9 @@ import { useSelection } from '@genealogy/SelectionContext'
 import { useGenealogyHover } from '@genealogy/hooks/useGenealogyHover'
 
 const ASPECT = 0.55 // height / width — fits the southern strip without too much vertical letterboxing
+/** Phones get a taller map so the migration isn't a thin strip. */
+const NARROW_ASPECT = 0.8
+const NARROW_WIDTH_PX = 640
 
 /**
  * Pinned: fetch states for the pinned person’s lineage (ancestors, self,
@@ -73,7 +76,7 @@ export default function MapView(props: MapViewProps): JSX.Element {
     const el = svgEl
     const w = width()
     if (!el || w <= 0) return
-    const h = Math.max(240, Math.round(w * ASPECT))
+    const h = Math.max(240, Math.round(w * (w < NARROW_WIDTH_PX ? NARROW_ASPECT : ASPECT)))
 
     handle?.destroy()
     handle = createGenealogyMap(el, props.nodes, w, h, {
@@ -95,6 +98,7 @@ export default function MapView(props: MapViewProps): JSX.Element {
       if (data && needStates.length > 0) handle?.setHistoricalCounties(data)
       else handle?.setHistoricalCounties(null)
       handle?.setHighlightedCounties(highlightedCountyKeys())
+      handle?.setActivePlace(props.getTimelineFocusStep?.()?.locationLabel ?? null)
     })
   })
 
@@ -138,6 +142,12 @@ export default function MapView(props: MapViewProps): JSX.Element {
     handle?.setHighlightedCounties(keys)
   })
 
+  // Ink the place label for the active timeline event in the accent colour.
+  createEffect(() => {
+    const step = props.getTimelineFocusStep?.() ?? null
+    handle?.setActivePlace(step?.locationLabel ?? null)
+  })
+
   // Zoom to the active timeline event's county (or fall back to the node).
   createEffect(() => {
     const step = props.getTimelineFocusStep?.() ?? null
@@ -167,7 +177,7 @@ export default function MapView(props: MapViewProps): JSX.Element {
         ref={(el) => {
           svgEl = el
         }}
-        class="block w-full bg-card rounded-md border border-border"
+        class="block w-full bg-map-ground"
         data-testid="genealogy-map-svg"
       />
       <GenealogyNodeCursorTooltip state={hover.tooltip()} testid="genealogy-map-tooltip" />

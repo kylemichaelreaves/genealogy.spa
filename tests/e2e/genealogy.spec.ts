@@ -1,19 +1,19 @@
 import { test, expect } from './fixtures/fixtures'
-import { GENEALOGY_NODE_IDS } from './pages/GenealogyPage'
+import { GENEALOGY_NODE_IDS, WITHHELD_NODE_IDS } from './pages/GenealogyPage'
 
 // The source repo also asserted that the app sidebar exposed a Genealogy
 // section and that navigating there landed on /budget-visualizer/genealogy.
-// Neither exists standalone, so those assertions are gone; everything below
-// tests the page itself and is unchanged.
+// Neither exists standalone, so those assertions are gone.
 test.describe('Genealogy page', () => {
-  test('renders heading and both panels', async ({ genealogyPage }) => {
+  test('renders the plate heading, map, register and timeline', async ({ genealogyPage }) => {
     await genealogyPage.goto()
     await expect(genealogyPage.heading).toBeVisible()
     await expect(genealogyPage.mapPanel).toBeVisible()
-    await expect(genealogyPage.familyTree).toBeVisible()
+    await expect(genealogyPage.register).toBeVisible()
+    await expect(genealogyPage.timeline).toBeVisible()
   })
 
-  test('family tree renders one card per seed ancestor', async ({ genealogyPage }) => {
+  test('register lists one row per public ancestor', async ({ genealogyPage }) => {
     await genealogyPage.goto()
     await expect(genealogyPage.personCards).toHaveCount(GENEALOGY_NODE_IDS.length)
     for (const id of GENEALOGY_NODE_IDS) {
@@ -21,12 +21,21 @@ test.describe('Genealogy page', () => {
     }
   })
 
+  test('withheld relatives are left off the register and the map', async ({ genealogyPage }) => {
+    await genealogyPage.goto()
+    for (const id of WITHHELD_NODE_IDS) {
+      await expect(genealogyPage.personCard(id)).toHaveCount(0)
+      await expect(genealogyPage.mapNode(id)).toHaveCount(0)
+    }
+    await expect(genealogyPage.withheldNote).toContainText('withheld')
+  })
+
   test('map renders southern-state shapes, connectors, and one circle per ancestor', async ({
     genealogyPage,
   }) => {
     await genealogyPage.goto()
     await expect(genealogyPage.mapSvg).toBeVisible()
-    // Six ancestors have a non-null parentId in the seed data, so six connector paths render.
+    // Every public ancestor but the first has a parent on the page, so one connector each.
     const connectorCount = GENEALOGY_NODE_IDS.length - 1
     await expect(genealogyPage.connectorPaths).toHaveCount(connectorCount)
     await expect(genealogyPage.mapCircles).toHaveCount(GENEALOGY_NODE_IDS.length)
@@ -42,55 +51,58 @@ test.describe('Genealogy page', () => {
       .toBeGreaterThan(0)
   })
 
-  test('hovering a person card selects the matching map node and shows the tree tooltip', async ({
-    genealogyPage,
-  }) => {
+  test('hovering a register row selects the matching map node', async ({ genealogyPage }) => {
     await genealogyPage.goto()
-    // Use the depth-0 ancestor so the tree's selection-driven scrollIntoView
-    // does not move cards under the stationary cursor mid-hover. william-rives
-    // is also interactive at the default playhead year (1748).
     const targetId = 'william-rives'
 
     // Nothing selected initially — every circle reports data-selected=false.
     await expect(genealogyPage.selectedMapNode).toHaveCount(0)
 
     await genealogyPage.personCard(targetId).hover()
-    // Cross-panel sync: the map node for the hovered card becomes the selected one.
     await expect(genealogyPage.selectedMapNode).toHaveCount(1)
     await expect(genealogyPage.mapNode(targetId)).toHaveAttribute('data-selected', 'true')
-
-    // The tooltip that appears belongs to the tree panel, not the map panel.
-    await expect(genealogyPage.treeTooltip).toBeVisible()
-    await expect(genealogyPage.treeTooltip).toContainText('William Rives')
+    // The register carries the details inline, so no map tooltip appears.
     await expect(genealogyPage.mapTooltip).toBeHidden()
   })
 
-  test('moving off the card clears selection and hides the tooltip', async ({ genealogyPage }) => {
+  test('moving off the row clears selection', async ({ genealogyPage }) => {
     await genealogyPage.goto()
-    const card = genealogyPage.personCard('william-rives')
-
-    await card.hover()
+    await genealogyPage.personCard('william-rives').hover()
     await expect(genealogyPage.selectedMapNode).toHaveCount(1)
-    await expect(genealogyPage.treeTooltip).toBeVisible()
 
     await genealogyPage.heading.hover()
-    await expect(genealogyPage.treeTooltip).toBeHidden()
     await expect(genealogyPage.selectedMapNode).toHaveCount(0)
   })
 
-  test('timeline axis and rail are visible by default', async ({ genealogyPage }) => {
+  test('timeline next advances the year and the active register row follows', async ({ genealogyPage }) => {
     await genealogyPage.goto()
     await expect(genealogyPage.timelineAxis).toBeVisible()
-    await expect(genealogyPage.timelineOverlay).toBeVisible()
-  })
-
-  test('timeline next control advances the displayed year', async ({ genealogyPage }) => {
-    await genealogyPage.goto()
-    await expect(genealogyPage.timelineOverlay).toBeVisible()
+    await expect(genealogyPage.activeRegisterRow).toHaveAttribute(
+      'data-testid',
+      'genealogy-person-william-rives',
+    )
     const y0 = await genealogyPage.timelineYear.textContent()
     await genealogyPage.timelineNext.click()
     const y1 = await genealogyPage.timelineYear.textContent()
     expect(y0).toBeTruthy()
     expect(y1).not.toBe(y0)
+    await expect(genealogyPage.activeRegisterRow).toHaveAttribute(
+      'data-testid',
+      'genealogy-person-edmond-reaves',
+    )
+  })
+
+  test('theme toggle switches between light and dark and remembers the choice', async ({ genealogyPage }) => {
+    await genealogyPage.page.emulateMedia({ colorScheme: 'light' })
+    await genealogyPage.goto()
+    const html = genealogyPage.page.locator('html')
+    await expect(html).not.toHaveClass(/\bdark\b/)
+
+    await genealogyPage.themeToggle.click()
+    await expect(html).toHaveClass(/\bdark\b/)
+    await expect(genealogyPage.themeToggle).toHaveAccessibleName('Switch to light theme')
+
+    await genealogyPage.page.reload()
+    await expect(html).toHaveClass(/\bdark\b/)
   })
 })

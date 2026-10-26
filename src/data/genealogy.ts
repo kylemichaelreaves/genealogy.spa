@@ -84,5 +84,7 @@ export const genealogyData: GenealogyNode[] = [
     deathCoords: null,
     parentId: 'lee-reaves',
     spouseId: null,
+    // No birth year on record, so possibly living: kept off the public page.
+    withheld: true,
   },
 ]

@@ -71,11 +71,12 @@ export function createGenealogyMapHistoricalCountiesLayer(
   function applyCountiesHighlightStyle(): void {
     if (!countyPaths) return
     countyPaths
-      .attr('fill', (f) => (isHighlighted(f) ? 'var(--chart-3)' : 'var(--chart-1)'))
-      .attr('stroke', (f) => (isHighlighted(f) ? 'var(--chart-3)' : 'var(--chart-1)'))
-      .attr('fill-opacity', (f) => (isHighlighted(f) ? 0.6 : 0.08))
-      .attr('stroke-opacity', (f) => (isHighlighted(f) ? 1 : 0.45))
-      .attr('stroke-width', (f) => (isHighlighted(f) ? 1 : 0.25))
+      .attr('fill', (f) => (isHighlighted(f) ? 'var(--chart-3)' : 'none'))
+      .attr('stroke', (f) => (isHighlighted(f) ? 'var(--chart-3)' : 'var(--map-county)'))
+      .attr('fill-opacity', (f) => (isHighlighted(f) ? 0.45 : 0))
+      .attr('stroke-opacity', 1)
+      .attr('stroke-width', (f) => (isHighlighted(f) ? 1.2 : 0.5))
+      .attr('vector-effect', 'non-scaling-stroke')
       .attr('data-highlighted', (f) => (isHighlighted(f) ? 'true' : 'false'))
     if (highlightedCountyKeys && highlightedCountyKeys.size > 0) {
       countyPaths.filter((f) => isHighlighted(f)).raise()

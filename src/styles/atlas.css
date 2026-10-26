@@ -1,0 +1,98 @@
+/*
+ * Archival atlas theme — an engraved plate from a county atlas.
+ *
+ * Re-points the shadcn tokens from theme.css at a sepia palette so existing
+ * utilities (bg-card, text-muted-foreground, border-border…) pick it up, and
+ * adds the few atlas-only tokens the plate frame and the D3 map need.
+ * Light is the default; `.dark` on <html> switches (see utils/theme.ts).
+ */
+
+:root {
+  --font-atlas-display: 'Cormorant Garamond', Georgia, serif;
+  --font-atlas-body: 'EB Garamond', Georgia, serif;
+
+  --background: #e4d8bc;
+  --foreground: #2e261c;
+  --card: #f3ead6;
+  --card-foreground: #2e261c;
+  --popover: #f6efdf;
+  --popover-foreground: #2e261c;
+  --primary: #8e2f1f;
+  --primary-foreground: #f6efdf;
+  --secondary: #ead9b8;
+  --secondary-foreground: #2e261c;
+  --muted: #f6efdf;
+  --muted-foreground: #5c4b35;
+  --accent: #ead9b8;
+  --accent-foreground: #2e261c;
+  --border: #6b5537;
+  --ring: #8e2f1f;
+  --chart-1: #8e2f1f;
+  --chart-3: #b8863b;
+  --brand: #8e2f1f;
+
+  /* Kicker / small-caps labels and rules */
+  --atlas-rule: #6b5537;
+  --atlas-kicker: #6b5537;
+  /* Active register row */
+  --atlas-active: #ead9b8;
+  /* Accent used as text (oxblood passes 4.5:1 on the plate) */
+  --atlas-accent-text: #8e2f1f;
+
+  /* Map */
+  --map-ground: #efe6d2;
+  --map-county: #c9b48c;
+  --map-state-label: #7a6548;
+  --map-death: #3b2f23;
+  --map-halo: #f6efdf;
+}
+
+.dark {
+  --background: #120f0b;
+  --foreground: #ece2cc;
+  --card: #1b1712;
+  --card-foreground: #ece2cc;
+  --popover: #241f18;
+  --popover-foreground: #ece2cc;
+  --primary: #d8836a;
+  --primary-foreground: #1b1712;
+  --secondary: #2e261c;
+  --secondary-foreground: #ece2cc;
+  --muted: #241f18;
+  --muted-foreground: #c9bb9f;
+  --accent: #2e261c;
+  --accent-foreground: #ece2cc;
+  --border: #8a7552;
+  --input: #2e261c;
+  --ring: #d8836a;
+  --chart-1: #d8836a;
+  --chart-3: #c9a25a;
+  --brand: #e39a80;
+
+  --atlas-rule: #8a7552;
+  --atlas-kicker: #b5a588;
+  --atlas-active: #2e261c;
+  --atlas-accent-text: #e39a80;
+
+  --map-ground: #1b1712;
+  --map-county: #3f3528;
+  --map-state-label: #9c8a6c;
+  --map-death: #e8dcc4;
+  --map-halo: #1b1712;
+}
+
+@theme inline {
+  --font-atlas-display: var(--font-atlas-display);
+  --font-atlas-body: var(--font-atlas-body);
+  --color-atlas-rule: var(--atlas-rule);
+  --color-atlas-kicker: var(--atlas-kicker);
+  --color-atlas-active: var(--atlas-active);
+  --color-atlas-accent-text: var(--atlas-accent-text);
+  --color-map-ground: var(--map-ground);
+}
+
+@layer base {
+  body {
+    font-family: var(--font-atlas-body);
+  }
+}

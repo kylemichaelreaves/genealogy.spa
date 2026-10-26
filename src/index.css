@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import './styles/theme.css';
+@import './styles/atlas.css';
 
 #root {
   min-height: 100vh;
