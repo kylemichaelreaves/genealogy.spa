@@ -13,6 +13,8 @@ export type GenealogyNode = {
   deathCoords: Coords | null
   parentId: string | null
   spouseId: string | null
+  /** Living or possibly-living relative: kept in the data, left off the public page. */
+  withheld?: boolean
 }
 
 export type SelectionState = {

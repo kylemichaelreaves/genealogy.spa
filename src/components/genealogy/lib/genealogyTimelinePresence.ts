@@ -8,10 +8,3 @@ export function isGenealogyNodeInteractiveAtPlayhead(playheadYear: number, node:
   if (node.birthYear === null || !Number.isFinite(node.birthYear)) return false
   return node.birthYear <= playheadYear
 }
-
-/**
- * Tree cards: same rule as map circles — known birth year required, on or before the playhead.
- */
-export function isGenealogyTreeCardInteractive(playheadYear: number, node: GenealogyNode): boolean {
-  return isGenealogyNodeInteractiveAtPlayhead(playheadYear, node)
-}

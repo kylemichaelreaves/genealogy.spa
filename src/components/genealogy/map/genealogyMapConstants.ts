@@ -21,6 +21,13 @@ export const GENEALOGY_MAP_SOUTHERN_STATE_FIPS = new Set([
   '54', // West Virginia
 ])
 
+/**
+ * States the family actually moved through (VA, NC, SC, GA, AL, MS, TN): the
+ * projection fits these, so the plate frames the migration rather than Texas.
+ * The other southern states still draw, cropped, as context.
+ */
+export const GENEALOGY_MAP_FIT_STATE_FIPS = new Set(['01', '13', '28', '37', '45', '47', '51'])
+
 export const GENEALOGY_MAP_SELECT_NODE_RADIUS = 9
 export const GENEALOGY_MAP_DEFAULT_NODE_RADIUS = 6
 /** Circle `r` in map units — shrinks as zoom scale increases so nodes do not cover county highlights. */

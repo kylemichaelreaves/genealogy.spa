@@ -4,10 +4,13 @@
  * Layer stack (bottom → top under `data-role="genealogy-map-root"`):
  * - `states` — filtered southern state outlines (muted fill).
  * - `historical-counties` — time-filtered county polygons; highlight uses chart-3.
- * - `connectors` — parent→child quadratic paths with arrow marker.
+ * - `connectors` — parent→child "line of descent" between birthplaces.
+ * - `removals` — dotted birth→death curve per person (genealogyMapAnnotations).
  * - `nodes` — person circles; `setSelected` dims non-selected and updates radii.
+ * - `deaths`, `state-labels`, `place-labels` — atlas annotations (genealogyMapAnnotations).
  *
- * Zoom applies to the whole `root` group; circle radii compensate using current scale `k`.
+ * Zoom applies to the whole `root` group; circle radii and annotations compensate
+ * using current scale `k`, and lines use non-scaling strokes.
  */
 import * as d3 from 'd3'
 import { feature } from 'topojson-client'
@@ -21,6 +24,7 @@ import {
   GENEALOGY_MAP_CIRCLE_R_MIN,
   GENEALOGY_MAP_CIRCLE_STROKE_BASE,
   GENEALOGY_MAP_DEFAULT_NODE_RADIUS,
+  GENEALOGY_MAP_FIT_STATE_FIPS,
   GENEALOGY_MAP_PADDING,
   GENEALOGY_MAP_SELECT_NODE_RADIUS,
   GENEALOGY_MAP_SINGLE_POINT_SCALE,
@@ -29,6 +33,7 @@ import {
   GENEALOGY_MAP_ZOOM_TRANSITION_MS,
 } from './genealogyMapConstants'
 import { createGenealogyMapHistoricalCountiesLayer } from './genealogyMapHistoricalCounties'
+import { drawGenealogyAnnotations, drawGenealogyRemovals } from './genealogyMapAnnotations'
 import {
   applyGenealogyMapZoomTransition,
   computeGenealogyMapZoomIdentityTransform,
@@ -61,6 +66,8 @@ export type GenealogyMapHandle = {
   zoomToCountyKeys: (keys: ReadonlySet<string>) => void
   /** Timeline scrub: grey out / disable circles for people not yet born at `playheadYear`. */
   setTimelineInteractionContext: (playheadYear: number) => void
+  /** Accent the place label for this location string (birth or death place), or none. */
+  setActivePlace: (location: string | null) => void
   destroy: () => void
 }
 
@@ -76,20 +83,6 @@ export function createGenealogyMap(
   const svg = d3.select(svgEl)
   svg.selectAll('*').remove()
   svg.attr('viewBox', `0 0 ${width} ${height}`).attr('width', width).attr('height', height)
-
-  const defs = svg.append('defs')
-  defs
-    .append('marker')
-    .attr('id', 'genealogy-arrow')
-    .attr('viewBox', '0 -5 10 10')
-    .attr('refX', 10)
-    .attr('refY', 0)
-    .attr('markerWidth', 6)
-    .attr('markerHeight', 6)
-    .attr('orient', 'auto')
-    .append('path')
-    .attr('d', 'M0,-5L10,0L0,5')
-    .attr('fill', 'var(--chart-1)')
 
   const root = svg.append('g').attr('data-role', 'genealogy-map-root')
 
@@ -107,7 +100,10 @@ export function createGenealogyMap(
       [GENEALOGY_MAP_PADDING, GENEALOGY_MAP_PADDING],
       [width - GENEALOGY_MAP_PADDING, height - GENEALOGY_MAP_PADDING],
     ],
-    southern,
+    {
+      type: 'FeatureCollection',
+      features: southern.features.filter((f) => GENEALOGY_MAP_FIT_STATE_FIPS.has(String(f.id))),
+    },
   )
   const path = d3.geoPath(projection)
 
@@ -120,7 +116,8 @@ export function createGenealogyMap(
     .attr('d', (f) => path(f) ?? '')
     .attr('fill', 'var(--muted)')
     .attr('stroke', 'var(--border)')
-    .attr('stroke-width', 0.5)
+    .attr('stroke-width', 1)
+    .attr('vector-effect', 'non-scaling-stroke')
 
   // eslint-disable-next-line prefer-const -- assigned once after `updateCircleRadii`; referenced earlier via `getZoomBehavior`
   let zoomBehavior!: d3.ZoomBehavior<SVGSVGElement, unknown>
@@ -169,10 +166,12 @@ export function createGenealogyMap(
     })
     .attr('fill', 'none')
     .attr('stroke', 'var(--chart-1)')
-    .attr('stroke-opacity', 0.6)
-    .attr('stroke-width', 1.25)
-    .attr('stroke-dasharray', '6 3')
-    .attr('marker-end', 'url(#genealogy-arrow)')
+    .attr('stroke-opacity', 0.9)
+    .attr('stroke-width', 1.6)
+    .attr('stroke-linecap', 'round')
+    .attr('vector-effect', 'non-scaling-stroke')
+
+  drawGenealogyRemovals(root, nodes, (lng, lat) => projection([lng, lat]))
 
   let selectedNodeId: string | null = null
   let currentZoomK = 1
@@ -198,7 +197,7 @@ export function createGenealogyMap(
     .attr('cy', (n) => projectNode(n)?.[1] ?? -9999)
     .attr('r', (n) => circleRadiusFor(n))
     .attr('fill', 'var(--chart-1)')
-    .attr('stroke', 'var(--background)')
+    .attr('stroke', 'var(--map-halo)')
     .attr('stroke-width', circleStrokeWidth())
     .attr('cursor', 'pointer')
     .attr('data-node-id', (n) => n.id)
@@ -254,6 +253,15 @@ export function createGenealogyMap(
 
   applyCircleVisualState()
 
+  const annotations = drawGenealogyAnnotations({
+    root,
+    nodes,
+    project: (lng, lat) => projection([lng, lat]),
+    states: southern.features,
+    centroid: (f) => path.centroid(f),
+    width,
+  })
+
   function updateCircleRadii(): void {
     circles.attr('r', (n) => circleRadiusFor(n)).attr('stroke-width', circleStrokeWidth())
   }
@@ -265,6 +273,7 @@ export function createGenealogyMap(
       currentZoomK = event.transform.k
       root.attr('transform', event.transform.toString())
       updateCircleRadii()
+      annotations.setZoom(currentZoomK)
     })
 
   svg.call(zoomBehavior)
@@ -337,6 +346,7 @@ export function createGenealogyMap(
     zoomToNodeIds,
     zoomToCountyKeys: countiesHandle.zoomToCountyKeys,
     setTimelineInteractionContext,
+    setActivePlace: annotations.setActivePlace,
     destroy,
   }
 }
