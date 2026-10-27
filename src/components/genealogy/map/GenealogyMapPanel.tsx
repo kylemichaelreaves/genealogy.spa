@@ -64,7 +64,7 @@ export default function GenealogyMapPanel(props: {
 }): JSX.Element {
   return (
     <figure
-      class="relative m-0 border-[3px] border-double border-atlas-rule bg-map-ground p-1 sm:p-1.5"
+      class="relative m-0 border-[3px] border-double border-atlas-rule bg-map-ground p-1 sm:p-1.5 fitted:h-full"
       data-testid="genealogy-map-panel"
     >
       <MapView nodes={props.nodes} getTimelineFocusStep={props.focusStep} />

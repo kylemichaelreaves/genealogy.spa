@@ -1,6 +1,7 @@
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, onCleanup, untrack } from 'solid-js'
 import { useElementSize } from '@composables/useElementSize'
+import { FITTED_LAYOUT_QUERY, useMediaQuery } from '@composables/useMediaQuery'
 import { useHistoricalCountiesForStates } from '@api/hooks/historicalCounties/useHistoricalCountiesForStates'
 import type { GenealogyNode } from '../../../types/genealogy'
 import type { GenealogyTimelineStep } from '@genealogy/lib/buildGenealogyTimeline'
@@ -44,10 +45,21 @@ export type MapViewProps = {
 export default function MapView(props: MapViewProps): JSX.Element {
   let svgEl: SVGSVGElement | undefined
   const [dims, attachWrapper] = useElementSize()
-  // `useElementSize` fires on every ResizeObserver tick, including height-only
-  // changes. The map only depends on width (height is derived via ASPECT), so
-  // memoize width to avoid rebuilding the entire D3 chart on height jitter.
-  const width = createMemo(() => dims().w)
+  const fitted = useMediaQuery(FITTED_LAYOUT_QUERY)
+  // When the plate fills the window, the wrapper's box is set by the layout and
+  // the map takes all of it. Otherwise the map sets its own height from its
+  // width, so height-only jitter from the observer must not rebuild the chart;
+  // the memo's equality check drops it.
+  const size = createMemo(
+    () => {
+      const { w, h } = dims()
+      if (w <= 0) return null
+      if (fitted() && h > 0) return { w, h }
+      return { w, h: Math.max(240, Math.round(w * (w < NARROW_WIDTH_PX ? NARROW_ASPECT : ASPECT))) }
+    },
+    null,
+    { equals: (a, b) => a?.w === b?.w && a?.h === b?.h },
+  )
   const { selectedId, pinnedId, playheadYear } = useSelection()
   const hover = useGenealogyHover()
 
@@ -74,9 +86,9 @@ export default function MapView(props: MapViewProps): JSX.Element {
 
   createEffect(() => {
     const el = svgEl
-    const w = width()
-    if (!el || w <= 0) return
-    const h = Math.max(240, Math.round(w * (w < NARROW_WIDTH_PX ? NARROW_ASPECT : ASPECT)))
+    const s = size()
+    if (!el || !s) return
+    const { w, h } = s
 
     handle?.destroy()
     handle = createGenealogyMap(el, props.nodes, w, h, {
@@ -133,8 +145,14 @@ export default function MapView(props: MapViewProps): JSX.Element {
     }
     if (!data) return
     handle.setHistoricalCounties(data)
-    handle.setPlayheadYear(playheadYear())
-    handle.setHighlightedCounties(highlightedCountyKeys())
+    // Re-apply playhead and highlight to the fresh paths without subscribing to
+    // them: their own effects below handle changes cheaply. Tracking them here
+    // rebuilt every county path (~5k, ~3 MB of path data) on each timeline step,
+    // which blocked the main thread for 350–650 ms per step.
+    untrack(() => {
+      handle?.setPlayheadYear(playheadYear())
+      handle?.setHighlightedCounties(highlightedCountyKeys())
+    })
   })
 
   createEffect(() => {
@@ -172,12 +190,14 @@ export default function MapView(props: MapViewProps): JSX.Element {
   })
 
   return (
-    <div ref={(el) => attachWrapper(el)} class="relative w-full" data-testid="genealogy-map">
+    <div ref={(el) => attachWrapper(el)} class="relative w-full fitted:h-full" data-testid="genealogy-map">
+      {/* Fitted, the svg is taken out of flow so its height can't feed back
+          into the wrapper box it is sized from. */}
       <svg
         ref={(el) => {
           svgEl = el
         }}
-        class="block w-full bg-map-ground"
+        class="block w-full bg-map-ground fitted:absolute fitted:inset-0 fitted:h-full"
         data-testid="genealogy-map-svg"
       />
       <GenealogyNodeCursorTooltip state={hover.tooltip()} testid="genealogy-map-tooltip" />

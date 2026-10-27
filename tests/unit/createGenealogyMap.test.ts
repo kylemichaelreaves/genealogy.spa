@@ -87,6 +87,58 @@ describe('createGenealogyMap', () => {
     expect(path().getAttribute('fill-opacity')).toBe('0.45')
   })
 
+  it('moves the highlight and the playhead without touching unaffected counties', () => {
+    const square = (x: number) => [
+      [
+        [x, 37.0],
+        [x + 0.2, 37.0],
+        [x + 0.2, 37.2],
+        [x, 37.2],
+        [x, 37.0],
+      ],
+    ]
+    const county = (id: string, x: number, startYear: number, endYear: number) => ({
+      type: 'Feature',
+      properties: { ID: id, VERSION: 1, state_abbr: 'va', startYear, endYear },
+      geometry: { type: 'Polygon', coordinates: square(x) },
+    })
+    const fc = {
+      type: 'FeatureCollection',
+      features: [
+        county('a', -78.0, 1700, Number.NaN),
+        county('b', -77.6, 1700, Number.NaN),
+        county('c', -77.2, 1800, Number.NaN),
+      ],
+    } as unknown as HistoricalCountyFeatureCollection
+    const { svg, handle } = mount()
+    handle.setHistoricalCounties(fc)
+    handle.setPlayheadYear(1750)
+    // D3 keeps each path's feature on `__data__`.
+    const paths = [...svg.querySelectorAll<SVGPathElement>('g[data-role="historical-counties"] path')]
+    const el = (id: string) =>
+      paths.find(
+        (p) => (p as unknown as { __data__: { properties: { ID: string } } }).__data__.properties.ID === id,
+      )!
+    const [a, b, c] = [el('a'), el('b'), el('c')]
+
+    // c starts in 1800, so it is hidden at 1750 and shown once the playhead passes it.
+    expect(c.style.display).toBe('none')
+    handle.setPlayheadYear(1820)
+    expect(c.style.display).toBe('')
+
+    const writesToC = vi.spyOn(c, 'setAttribute')
+    handle.setHighlightedCounties(new Set(['a:1']))
+    expect(a.getAttribute('data-highlighted')).toBe('true')
+    handle.setHighlightedCounties(new Set(['b:1']))
+    expect(a.getAttribute('data-highlighted')).toBe('false')
+    expect(a.getAttribute('fill')).toBe('none')
+    expect(b.getAttribute('data-highlighted')).toBe('true')
+    // The highlighted county is drawn last, on top of its neighbours.
+    expect(b.parentNode?.lastChild).toBe(b)
+    // c was never highlighted, so the highlight moving never rewrote it.
+    expect(writesToC).not.toHaveBeenCalled()
+  })
+
   it('selects and dims nodes, and greys out people not yet born', () => {
     const { svg, handle } = mount()
     handle.setSelected('william-rives')

@@ -83,6 +83,26 @@ describe('GenealogyPage (atlas plate)', () => {
     expect(q('g[data-place="Surry County, VA"]')?.getAttribute('data-active')).toBe('true')
   })
 
+  it('derives the map height from its width outside a desktop-sized window', async () => {
+    const { q } = await mount()
+    // jsdom has no matchMedia, so the layout is the stacked one: 900 × 0.55.
+    expect(q('[data-testid="genealogy-map-svg"]')?.getAttribute('height')).toBe('495')
+  })
+
+  it('fills the box the layout gives the map when the plate fits the window', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+    const { q } = await mount()
+    // The observer reports a 900 × 500 box; fitted, the map takes all of it.
+    const svg = q('[data-testid="genealogy-map-svg"]')
+    expect(svg?.getAttribute('width')).toBe('900')
+    expect(svg?.getAttribute('height')).toBe('500')
+  })
+
   it('glosses "removal" in the key on hover, focus and tap, and Escape closes it', async () => {
     const { q } = await mount()
     const term = q<HTMLButtonElement>('[data-testid="genealogy-legend-removal"]')!
@@ -122,5 +142,62 @@ describe('GenealogyPage (atlas plate)', () => {
     q<HTMLButtonElement>('[data-testid="genealogy-person-john-sr"]')!.click()
     expect(q('[data-testid="genealogy-timeline-year"]')?.textContent).toBe('1820')
     expect(q('[data-testid="genealogy-person-john-sr"]')?.dataset.active).toBe('true')
+  })
+
+  it('keeps the county paths across timeline steps instead of rebuilding them', async () => {
+    // One square county per requested state, valid for every year. The response
+    // waits until after the map is built, as a real network would: arriving
+    // earlier skips the code path that used to rebuild the paths on every step.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        await new Promise((r) => setTimeout(r, 40))
+        const abbr = /states\/([a-z]{2})\.topojson$/.exec(url)![1]
+        const topology = {
+          type: 'Topology',
+          arcs: [
+            [
+              [-80, 36],
+              [-79, 36],
+              [-79, 37],
+              [-80, 37],
+              [-80, 36],
+            ],
+          ],
+          objects: {
+            [abbr]: {
+              type: 'GeometryCollection',
+              geometries: [
+                {
+                  type: 'Polygon',
+                  arcs: [[0]],
+                  properties: {
+                    ID: `${abbr}_1`,
+                    VERSION: 1,
+                    NAME: 'TEST',
+                    FULL_NAME: 'Test County',
+                    state_abbr: abbr,
+                    START_DATE: '1600-01-01',
+                    END_DATE: '',
+                  },
+                },
+              ],
+            },
+          },
+        }
+        return new Response(JSON.stringify(topology), { status: 200 })
+      }),
+    )
+    const { q } = await mount()
+    await new Promise((r) => setTimeout(r, 60))
+    const first = q('g[data-role="historical-counties"] path')
+    expect(first).not.toBeNull()
+
+    q<HTMLButtonElement>('[data-testid="genealogy-timeline-next"]')!.click()
+    q<HTMLButtonElement>('[data-testid="genealogy-timeline-next"]')!.click()
+
+    // A rebuild would detach every path and create new ones.
+    expect(first!.isConnected).toBe(true)
+    expect(q('g[data-role="historical-counties"] path')).toBe(first)
   })
 })

@@ -51,7 +51,7 @@ function AtlasPlate(): JSX.Element {
 
   return (
     <section
-      class="mx-auto max-w-[1440px] border border-atlas-rule bg-card px-4 py-5 text-card-foreground outline outline-1 -outline-offset-[6px] outline-atlas-rule sm:px-8 sm:py-6"
+      class="mx-auto max-w-[1440px] border border-atlas-rule bg-card px-4 py-5 text-card-foreground outline outline-1 -outline-offset-[6px] outline-atlas-rule sm:px-8 sm:py-6 fitted:flex fitted:min-h-0 fitted:w-full fitted:max-w-none fitted:flex-1 fitted:flex-col"
       data-testid="genealogy-page"
     >
       <header class="flex items-end justify-between gap-4 border-b border-atlas-rule pb-3">
@@ -71,11 +71,13 @@ function AtlasPlate(): JSX.Element {
         </div>
       </header>
 
-      <div class="mt-4 grid grid-cols-1 gap-x-7 gap-y-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
-        <div class="order-1 min-w-0">
+      {/* Fitted to the window, the first row (map and register) takes whatever
+          height the header and timeline leave; the register scrolls if it must. */}
+      <div class="mt-4 grid grid-cols-1 gap-x-7 gap-y-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)] fitted:min-h-0 fitted:flex-1 fitted:grid-rows-[minmax(0,1fr)_auto]">
+        <div class="order-1 min-w-0 fitted:min-h-0">
           <GenealogyMapPanel nodes={nodes} focusStep={() => timeline.currentStep()} />
         </div>
-        <div class="order-3 min-w-0 lg:order-2">
+        <div class="order-3 min-w-0 lg:order-2 fitted:min-h-0 fitted:overflow-y-auto">
           <AtlasRegister
             nodes={nodes}
             generations={generations}
