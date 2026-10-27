@@ -1,9 +1,52 @@
 import type { JSX } from 'solid-js'
+import { createSignal, createUniqueId } from 'solid-js'
 import type { GenealogyNode } from '../../../types/genealogy'
 import type { GenealogyTimelineStep } from '@genealogy/lib/buildGenealogyTimeline'
 import MapView from './MapView'
 
-function LegendRow(props: { children: JSX.Element; label: string }): JSX.Element {
+const REMOVAL_GLOSS =
+  '“Removal” is the period word for moving one’s household: records of the time say a family “removed to Mississippi.” Each dotted line runs from where a person was born to where they died.'
+
+/**
+ * A legend label with a gloss. The key is pointer-events-none so the map under
+ * it stays draggable; only this term opts back in. The gloss shows on hover and
+ * on keyboard focus, and a tap opens it too, since touch has no hover.
+ */
+function GlossedTerm(props: { term: string; gloss: string }): JSX.Element {
+  const [open, setOpen] = createSignal(false)
+  const glossId = createUniqueId()
+  return (
+    <span class="relative">
+      <button
+        type="button"
+        class="pointer-events-auto cursor-help rounded-sm underline decoration-atlas-kicker decoration-dotted underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-describedby={glossId}
+        data-testid="genealogy-legend-removal"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onClick={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setOpen(false)
+        }}
+      >
+        {props.term}
+      </button>
+      <span
+        id={glossId}
+        role="tooltip"
+        hidden={!open()}
+        class="absolute bottom-full left-0 mb-2 w-64 border border-atlas-rule bg-popover px-3 py-2 text-[13px] leading-snug text-popover-foreground shadow-md"
+        data-testid="genealogy-legend-removal-gloss"
+      >
+        {props.gloss}
+      </span>
+    </span>
+  )
+}
+
+function LegendRow(props: { children: JSX.Element; label: JSX.Element }): JSX.Element {
   return (
     <div class="flex items-center gap-2.5">
       <svg aria-hidden="true" width="26" height="12" viewBox="0 0 26 12">
@@ -46,7 +89,7 @@ export default function GenealogyMapPanel(props: {
         <LegendRow label="Line of descent">
           <path d="M1 6H25" stroke="var(--chart-1)" stroke-width="1.6" />
         </LegendRow>
-        <LegendRow label="A life's removal">
+        <LegendRow label={<GlossedTerm term="A life's removal" gloss={REMOVAL_GLOSS} />}>
           <path
             d="M1 6H25"
             stroke="var(--chart-1)"
