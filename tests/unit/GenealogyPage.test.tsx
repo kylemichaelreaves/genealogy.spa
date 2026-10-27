@@ -83,6 +83,30 @@ describe('GenealogyPage (atlas plate)', () => {
     expect(q('g[data-place="Surry County, VA"]')?.getAttribute('data-active')).toBe('true')
   })
 
+  it('glosses "removal" in the key on hover, focus and tap, and Escape closes it', async () => {
+    const { q } = await mount()
+    const term = q<HTMLButtonElement>('[data-testid="genealogy-legend-removal"]')!
+    const gloss = q('[data-testid="genealogy-legend-removal-gloss"]')!
+    expect(gloss.getAttribute('role')).toBe('tooltip')
+    expect(term.getAttribute('aria-describedby')).toBe(gloss.id)
+    expect(gloss.textContent).toContain('removed to Mississippi')
+    expect(gloss.hidden).toBe(true)
+
+    term.dispatchEvent(new MouseEvent('mouseenter'))
+    expect(gloss.hidden).toBe(false)
+    term.dispatchEvent(new MouseEvent('mouseleave'))
+    expect(gloss.hidden).toBe(true)
+
+    term.focus()
+    expect(gloss.hidden).toBe(false)
+    term.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(gloss.hidden).toBe(true)
+    term.blur()
+
+    term.click()
+    expect(gloss.hidden).toBe(false)
+  })
+
   it('moves the timeline, the active register row and the active map label together', async () => {
     const { q } = await mount()
     const active = () => q('[data-testid="genealogy-register"] [data-active="true"]')?.dataset.testid
