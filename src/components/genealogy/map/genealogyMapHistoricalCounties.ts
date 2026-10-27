@@ -49,43 +49,76 @@ export function createGenealogyMapHistoricalCountiesLayer(
   let highlightedCountiesIgnorePlayhead = true
   let playheadBypassStateAbbrs: ReadonlySet<string> | null = null
 
-  function isHighlighted(f: HistoricalCountyFeature): boolean {
-    return highlightedCountyKeys !== null && highlightedCountyKeys.has(getHistoricalCountyKey(f))
+  // There are thousands of county paths and a timeline step changes only a few
+  // of them, so updates diff against what each path already shows and write
+  // only the paths that change. Restyling every path on every step cost ~100 ms
+  // of script plus a full style recalc on a phone-class CPU.
+  let countyElements: SVGPathElement[] = []
+  let countyFeatures: HistoricalCountyFeature[] = []
+  let countyKeys: string[] = []
+  const elementByKey = new Map<string, SVGPathElement>()
+  /** Visibility each path currently has; `undefined` until first applied. */
+  let shown: (boolean | undefined)[] = []
+
+  function isHighlightedKey(key: string): boolean {
+    return highlightedCountyKeys !== null && highlightedCountyKeys.has(key)
+  }
+
+  function isVisible(i: number): boolean {
+    if (highlightedCountiesIgnorePlayhead && isHighlightedKey(countyKeys[i]!)) return true
+    const f = countyFeatures[i]!
+    const st = String(f.properties.state_abbr ?? '').toLowerCase()
+    if (playheadBypassStateAbbrs?.has(st)) return true
+    const year = currentPlayheadYear
+    if (year === null || !Number.isFinite(year)) return false
+    const { startYear, endYear } = f.properties
+    const startOk = !Number.isFinite(startYear) || year >= startYear
+    const endOk = !Number.isFinite(endYear) || year <= endYear
+    return startOk && endOk
   }
 
   function applyCountiesVisibility(): void {
-    if (!countyPaths) return
-    const year = currentPlayheadYear
-    countyPaths.style('display', (f) => {
-      if (highlightedCountiesIgnorePlayhead && isHighlighted(f)) return null
-      const st = String(f.properties.state_abbr ?? '').toLowerCase()
-      if (playheadBypassStateAbbrs?.has(st)) return null
-      if (year === null || !Number.isFinite(year)) return 'none'
-      const { startYear, endYear } = f.properties
-      const startOk = !Number.isFinite(startYear) || year >= startYear
-      const endOk = !Number.isFinite(endYear) || year <= endYear
-      return startOk && endOk ? null : 'none'
-    })
+    for (let i = 0; i < countyElements.length; i++) {
+      const visible = isVisible(i)
+      if (shown[i] === visible) continue
+      shown[i] = visible
+      countyElements[i]!.style.display = visible ? '' : 'none'
+    }
   }
 
-  function applyCountiesHighlightStyle(): void {
-    if (!countyPaths) return
-    countyPaths
-      .attr('fill', (f) => (isHighlighted(f) ? 'var(--chart-3)' : 'none'))
-      .attr('stroke', (f) => (isHighlighted(f) ? 'var(--chart-3)' : 'var(--map-county)'))
-      .attr('fill-opacity', (f) => (isHighlighted(f) ? 0.45 : 0))
-      .attr('stroke-opacity', 1)
-      .attr('stroke-width', (f) => (isHighlighted(f) ? 1.2 : 0.5))
-      .attr('vector-effect', 'non-scaling-stroke')
-      .attr('data-highlighted', (f) => (isHighlighted(f) ? 'true' : 'false'))
-    if (highlightedCountyKeys && highlightedCountyKeys.size > 0) {
-      countyPaths.filter((f) => isHighlighted(f)).raise()
+  function styleCounty(el: SVGPathElement, highlighted: boolean): void {
+    el.setAttribute('fill', highlighted ? 'var(--chart-3)' : 'none')
+    el.setAttribute('stroke', highlighted ? 'var(--chart-3)' : 'var(--map-county)')
+    el.setAttribute('fill-opacity', highlighted ? '0.45' : '0')
+    el.setAttribute('stroke-width', highlighted ? '1.2' : '0.5')
+    el.dataset.highlighted = String(highlighted)
+  }
+
+  /** Restyle only the counties entering or leaving the highlight; raise the new ones. */
+  function applyHighlightChange(previous: ReadonlySet<string> | null): void {
+    const next = highlightedCountyKeys
+    for (const key of previous ?? []) {
+      if (next?.has(key)) continue
+      const el = elementByKey.get(key)
+      if (el) styleCounty(el, false)
+    }
+    for (const key of next ?? []) {
+      if (previous?.has(key)) continue
+      const el = elementByKey.get(key)
+      if (!el) continue
+      styleCounty(el, true)
+      el.parentNode?.appendChild(el)
     }
   }
 
   function setHistoricalCounties(fc: HistoricalCountyFeatureCollection | null): void {
     countiesLayer.selectAll('path').remove()
     playheadBypassStateAbbrs = null
+    countyElements = []
+    countyFeatures = []
+    countyKeys = []
+    elementByKey.clear()
+    shown = []
     if (!fc || fc.features.length === 0) {
       countyPaths = null
       return
@@ -96,10 +129,19 @@ export function createGenealogyMapHistoricalCountiesLayer(
       .join('path')
       .attr('d', (f) => path(f) ?? '')
       .attr('pointer-events', 'none')
+      .attr('stroke-opacity', 1)
+      .attr('vector-effect', 'non-scaling-stroke')
       .attr('data-state-abbr', (f) => f.properties.state_abbr)
       .attr('data-start-year', (f) => f.properties.startYear)
       .attr('data-end-year', (f) => f.properties.endYear)
-    applyCountiesHighlightStyle()
+    countyElements = countyPaths.nodes()
+    countyFeatures = countyPaths.data()
+    countyKeys = countyFeatures.map(getHistoricalCountyKey)
+    countyElements.forEach((el, i) => {
+      elementByKey.set(countyKeys[i]!, el)
+      styleCounty(el, false)
+    })
+    applyHighlightChange(null)
     applyCountiesVisibility()
   }
 
@@ -109,8 +151,9 @@ export function createGenealogyMapHistoricalCountiesLayer(
   }
 
   function setHighlightedCounties(keys: ReadonlySet<string> | null): void {
+    const previous = highlightedCountyKeys
     highlightedCountyKeys = keys && keys.size > 0 ? keys : null
-    applyCountiesHighlightStyle()
+    applyHighlightChange(previous)
     applyCountiesVisibility()
   }
 
@@ -126,7 +169,7 @@ export function createGenealogyMapHistoricalCountiesLayer(
 
   function zoomToCountyKeys(keys: ReadonlySet<string>): void {
     if (!countyPaths || keys.size === 0) return
-    const features = countyPaths.data().filter((f) => keys.has(getHistoricalCountyKey(f)))
+    const features = countyFeatures.filter((_, i) => keys.has(countyKeys[i]!))
     if (features.length === 0) return
 
     let x0 = Infinity

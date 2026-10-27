@@ -15,7 +15,7 @@ const root = document.getElementById('root')
 render(
   () => (
     <QueryClientProvider client={queryClient}>
-      <main class="bg-background text-foreground min-h-screen p-3 sm:p-6">
+      <main class="bg-background text-foreground min-h-screen p-3 sm:p-6 fitted:flex fitted:h-dvh fitted:flex-col">
         <GenealogyPage />
       </main>
     </QueryClientProvider>

@@ -2,6 +2,9 @@
 @import './styles/theme.css';
 @import './styles/atlas.css';
 
+/* The plate fills the browser window. Must match FITTED_LAYOUT_QUERY in useMediaQuery.ts. */
+@custom-variant fitted (@media (min-width: 64rem) and (min-height: 37.5rem));
+
 #root {
   min-height: 100vh;
 }
