@@ -91,7 +91,7 @@ export function createGenealogyMapHistoricalCountiesLayer(
     el.setAttribute('stroke', highlighted ? 'var(--chart-3)' : 'var(--map-county)')
     el.setAttribute('fill-opacity', highlighted ? '0.45' : '0')
     el.setAttribute('stroke-width', highlighted ? '1.2' : '0.5')
-    el.setAttribute('data-highlighted', highlighted ? 'true' : 'false')
+    el.dataset.highlighted = String(highlighted)
   }
 
   /** Restyle only the counties entering or leaving the highlight; raise the new ones. */
